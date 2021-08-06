@@ -1,5 +1,13 @@
-# linearAnalysisTools-dataDriven
+# linearAnalysisTools-dataDriven 
 A unstructured data-driven framework for Professor Kunihiko Taira Group at UCLA
+
+'qsub installCGNS.sub' on Hoffman2 to build CGNS library for I/O.
+copy pyCGNS/CGNS.so within the folder you are running the analysis and within labTools folder.
+
+execute with:
+mpiexe -n $NSLOTS autoCorrelation.py -options
+
+for each .py file.
 
 Code is divided in 3 parts:
 
@@ -46,3 +54,5 @@ outputModes.py inputs:
           
   -outputdir :
         folder to put correlation matrices for each variable
+
+ 
