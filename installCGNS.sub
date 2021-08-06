@@ -31,7 +31,11 @@ sed -i "s/$OLD/$NEW/g" make.defs
 make
 
 # now we copy the main compliled files to the pyCGNS folder
-cd ../../pyCGNS/libs_gnu
+cd ../../pyCGNS/
+mkdir libs_gnu
+cd libs_gnu
+mkdir include
+cd ../
 cp ../../CGNS/src/lib/* .
 cd include
 cp ../../../CGNS/src/cgnsBuild.defs .
