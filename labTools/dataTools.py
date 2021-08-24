@@ -1,8 +1,82 @@
-# Generate grid files
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+
+# Lots of helpful functions here
+# ---------- readbinfiles(varname,idx)             : read binary files
+# ---------- var(x)                                : associate indices to variable names
+# ---------- spod_filter(C,Nfilt)                  : Spectral POD (Sieber et al, JFM, 2016) for POD and DMD analysis
+# ---------- genGrid(nodes,elems)                  : generate "grid.cgns" file using nodalCoordinates.dat and elementConnectivity.dat
+# ---------- makeWing(aoa,sw,dz,no3dcells,closed)  : generate "wing.cgns" file for airfoil cases only
+
+
+# ----- Department of Mechanical and Aerospace Engineering
+# ----- University of California, Los Angeles
+# ----- Author: Jean Helder Marques Ribeiro
+# ----- email:  jeanmarques@g.ucla.edu
+# ----- Date: August/2021
 import os,sys,getopt
 import numpy as np
 import CGNS
 
+# ------------- Read files in binFiles folder -----------#
+# ------------- Read files in binFiles folder -----------#
+# ------------- Read files in binFiles folder -----------#
+# ------------- Read files in binFiles folder -----------#
+def readbinfiles(varname,idx):
+    # is this strange? yes. But this is the way CharLES does it, so keep it like that
+    if (idx >= 10000000):
+        filename = '%s.%08d.dat' % (varname,idx)
+    elif (idx >= 1000000):
+        filename = '%s.%07d.dat' % (varname,idx)
+    else:
+        filename = '%s.%06d.dat' % (varname,idx)
+
+    qread      = np.fromfile(filename, np.float64)
+    return qread
+
+# ------------- Index-to-Variable Function --------------#
+# ------------- Index-to-Variable Function --------------#
+# ------------- Index-to-Variable Function --------------#                
+# ------------- Index-to-Variable Function --------------#
+def var(x):
+    return {
+        0: 'ux',
+        1: 'uy',
+        2: 'uz',
+        3: 'vx',
+        4: 'vy',
+        5: 'vz',
+        6: 'p',
+        7: 'rho',
+    }[x]
+
+# ---------- SPOD Sieber et al (JFM, 2016) -------------#
+# ---------- SPOD Sieber et al (JFM, 2016) -------------#
+# ---------- SPOD Sieber et al (JFM, 2016) -------------#
+# ---------- SPOD Sieber et al (JFM, 2016) -------------#
+def spod_filter(C,Nfilt):
+    T     = C.shape[0]
+    Cbar  = np.zeros((T,T))
+    # Gaussian function
+    f = np.exp(-np.linspace(-2.285,2.285,2*Nfilt+1)**2) 
+    f = f/np.sum(f)
+    if (Nfilt > 0):
+        for i in range(T):
+            for j in range(T):
+                dummy = 0.
+                for k in range(-Nfilt,Nfilt+1):
+                    dummy += C[i+k,j+k]*f[k+Nfilt] 
+                Cbar[i,j] = dummy
+    else:
+        Cbar = C
+    return Cbar
+
+# ---------- Generate GRID.CGNS -------------#
+# ---------- Generate GRID.CGNS -------------#
+# ---------- Generate GRID.CGNS -------------#
+# ---------- Generate GRID.CGNS -------------#
 def genGrid(nodes,elems):
 
     # Read binary files
@@ -25,7 +99,10 @@ def genGrid(nodes,elems):
 
     return nno
 
-
+# ---------- Generate WING.CGNS -------------#
+# ---------- Generate WING.CGNS -------------#
+# ---------- Generate WING.CGNS -------------#
+# ---------- Generate WING.CGNS -------------#
 def makeWing(aoa,sw,dz,no3dcells,closed):
 
     # Generate wing geometry file:
@@ -69,7 +146,7 @@ def makeWing(aoa,sw,dz,no3dcells,closed):
 
     XA  = np.concatenate((XA,XA), axis=0) 
     YA  = np.concatenate((YA,YA), axis=0)
-    ZA  = np.concatenate((ZA,dz*no3dcells*np.ones(ZA.shape[0])),axis=0)
+    ZA  = np.concatenate((ZA,dz*np.ones(ZA.shape[0])),axis=0)
 
     XA = XA + 1
 
