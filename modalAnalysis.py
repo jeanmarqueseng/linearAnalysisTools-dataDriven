@@ -1,4 +1,18 @@
-# Preprocess to get the required matrices
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+# ---------- WELCOME TO JEAN'S DATA DRIVEN WORLD !!!! -------------#
+
+# This code processes the snapshot matrices and computes:
+# ----- POD singular values and vectors
+# ----- DMD eigenvalues and vectors
+# ----- not the spatial modes, these are done afterwards on outputModes.py
+
+# ----- Department of Mechanical and Aerospace Engineering
+# ----- University of California, Los Angeles
+# ----- Author: Jean Helder Marques Ribeiro
+# ----- email:  jeanmarques@g.ucla.edu
+# ----- Date: August/2021
 import os,sys,getopt
 sys.path.append('./labTools')
 
@@ -6,39 +20,12 @@ import numpy as np
 import scipy.linalg as sp
 from mpi4py import MPI
 
-from genGrid import *
+from dataTools import *
+
+from scipy.io import loadmat,savemat
 
 import argparse
 import time
-
-def spod_filter(C,Nfilt):
-    T     = C.shape[0]
-    Cbar  = np.zeros((T,T))
-    # Gaussian function
-    f = np.exp(-np.linspace(-2.285,2.285,2*Nfilt+1)**2) 
-    f = f/np.sum(f)
-    if (Nfilt > 0):
-        for i in range(T):
-            for j in range(T):
-                dummy = 0.
-                for k in range(-Nfilt,Nfilt+1):
-                    dummy += C[i+k,j+k]*f[k+Nfilt] 
-                Cbar[i,j] = dummy
-    else:
-        Cbar = C
-    return Cbar
-
-def var(x):
-    return {
-        0: 'rho',
-        1: 'ux',
-        2: 'uy',
-        3: 'uz',
-        4: 'vx',
-        5: 'vy',
-        6: 'vz',
-        7: 'p',
-    }[x]
 
 if __name__ == '__main__':
 
@@ -49,49 +36,72 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
+    # ---------------------- INPUT ARGS ---------------------#
+    # ---------------------- INPUT ARGS ---------------------#
+    # ---------------------- INPUT ARGS ---------------------#
+    # ---------------------- INPUT ARGS ---------------------#
     parser = argparse.ArgumentParser()
-    parser.add_argument('-range',type=int, nargs=3,help='<istart> <iend> <istep>')
+    parser.add_argument('-domain',type=int, nargs=1,help='<whole> only')
     parser.add_argument('-outputdir',type=str,help='Output folder for the binary files')
     parser.add_argument('-spod',type=int,help='Sieber-POD filter size: 0 (no filter), # of snapshots (DFT)')
-    parser.add_argument('-dt',type=float,help='Time step between data files')
     args = parser.parse_args()
 
-    if(args.range):
-        frange = args.range
-        files = np.arange(frange[0],frange[1]+frange[2],frange[2])
+    if(args.domain):
+        domain = args.domain
     else:
-        raise RuntimeError('You must tell me the range of files you want: <istart> <iend> <istep>')
+        domain = False
 
     if(args.outputdir):
         outdir = args.outputdir
     else:
-        outdir = './'
-
-    if(args.dt):
-        dt = args.dt
-    else:
-        dt = 0.1
+        outdir = './flowfield/'
 
     if(args.spod):
         spod = args.spod
     else:
         spod = 0
-    
+
+    # -------------- POD and DMD modes -----------------#   
+    # -------------- POD and DMD modes -----------------#
+    # -------------- POD and DMD modes -----------------# 
+    # -------------- POD and DMD modes -----------------#
     if (rank == 0):
-        nVar = 8
-        T    = files.shape[0]
+        # number of variables
+        qVar = np.arange(0,3,1)
+        nVar = qVar.shape[0]                                        
+        # check number of snapshots with the first correlation matrix for RHO
+        if (domain):
+            matLoad    = loadmat(outdir + '/%s.%02d.autoCorrelation.mat' % (var(qVar[0]),0))
+        else:
+            matLoad    = loadmat(outdir + '/%s.autoCorrelation.mat' % (var(qVar[0])))
+        T = matLoad['C'].shape[0]
         if (spod > T): spod = T-1
+        
+        matLoad    = loadmat(outdir + '/%s.spectralCorrelation.mat' % (var(qVar[0])))
+        F = matLoad['CSD'].shape[0]
+        N = matLoad['CSD'].shape[1]
+        
+        # Read correlation matrix for each variable
+        # if domain splitting in autoCorrelation.py, remember to sum all C's
+        C     = np.zeros((np.amax(qVar)+1,T,T),dtype=np.float32)
+        for iv in qVar:
+            if (domain):
+                for i in range(domain[0]):
+                    print('... reading %s' % (outdir + '/%s.%02d.autoCorrelation.mat' % (var(qVar[iv]),i)))
+                    matLoad    = loadmat(outdir + '/%s.%02d.autoCorrelation.mat' % (var(qVar[iv]),i))
+                    C[iv,:,:] += matLoad['C']
+            else:
+                matLoad    = loadmat(outdir + '/%s.autoCorrelation.mat' % (var(qVar[iv])))
+                C[iv,:,:] = matLoad['C']
 
-        # Read correlation matrix and read variable
-        C     = np.zeros((nVar,T,T),dtype=np.float32)
-        for iv in range(nVar):
-            filename = outdir + '/%s.autoCorrelation.dat' % (var(iv))
-            C[iv,:,:] = np.loadtxt(filename,delimiter=' ')
-
+        # --------------- STANDARD POD and DMD ----------------------#
+        # --------------- STANDARD POD and DMD ----------------------#
+        # --------------- STANDARD POD and DMD ----------------------#
+        # --------------- STANDARD POD and DMD ----------------------#
         # Compute POD/DMD norm
-        Cnorm = C[1,:,:] + C[2,:,:] + C[3,:,:]              # kinetic energy norm
-        #Cnorm = C[4,:,:] + C[5,:,:] + C[6,:,:]              # enstrophy norm
-        #Cnorm = C[7,:,:]              # pressure norm
+        Cnorm = C[0,:,:] + C[1,:,:] + C[2,:,:]              # kinetic energy norm
+        #Cnorm = C[3,:,:] + C[4,:,:] + C[5,:,:]              # enstrophy norm
+        #Cnorm = C[6,:,:]                                    # pressure norm
 
         # apply SPOD filter (SPOD by Sieber et al. (JFM, 2016))
         Cnorm    = spod_filter(Cnorm,spod)
@@ -102,23 +112,51 @@ if __name__ == '__main__':
         uc,sc,vc = sp.svd(cc)
         sc       = np.sqrt(sc)
 
-        np.savetxt(outdir + '/singularValues.dat', sc, delimiter=' ')
-        np.savetxt(outdir + '/singularVectors.dat', uc, delimiter=' ')
-        np.savetxt(outdir + '/correlationMatrix.dat', cc, delimiter=' ')
+        savemat(outdir + '/singularValues.mat',    {'S':sc})
+        savemat(outdir + '/singularVectors.mat',   {'U':uc})
+        savemat(outdir + '/correlationMatrix.mat', {'C':cc})
         
-        # compute DMD modes (check J. Tu Thesis if you want, but really, it's just this)
         # I did not truncate the POD modes, but you can do that later if you want just by doing this:
         # trunc = 5
         # sc = sc[0:trunc]
         # uc = uc[0:trunc,:]
         # vc = vc[0:trunc,:]
-        # Compute transition matrix A
+
+        # compute DMD modes (check J. Tu Thesis if you want, but really, it's just this)
+        # Transition matrix A
         A   =  np.diag(1/sc)@vc@cp@vc.transpose().conj()@np.diag(1/sc)
         
         mu,v = sp.eig(A) 
 
-        np.savetxt(outdir + '/eigenValues.dat', mu)
-        np.savetxt(outdir + '/eigenVectors.dat', v)
+        savemat(outdir + '/eigenValues.mat',  {'mu':mu})
+        savemat(outdir + '/eigenVectors.mat', {'V':v})
+        
+        # --------------- SPECTRAL POD ----------------------#
+        # --------------- SPECTRAL POD ----------------------#
+        # --------------- SPECTRAL POD ----------------------#
+        # --------------- SPECTRAL POD ----------------------#
+        CSD   = np.zeros((np.amax(qVar)+1,F,N,N),dtype=np.complex64)
+        svec  = np.zeros((F,N,N),dtype=np.complex64)
+        sval  = np.zeros((F,N),dtype=np.complex64)
+        for iv in range(nVar):
+            matLoad    = loadmat(outdir + '/%s.spectralCorrelation.mat' % (var(iv)))
+            CSD[iv,:,:,:] = matLoad['CSD']
+
+        for f in range(F):
+            # Compute SPOD norm
+            Cnorm = CSD[0,f,:,:] + CSD[1,f,:,:] + CSD[2,f,:,:]              # kinetic energy norm
+            #Cnorm = CSD[3,f,:,:] + CSD[4,f,:,:] + CSD[5,f,:,:]              # enstrophy norm
+            #Cnorm = CSD[6,f,:,:]                                            # pressure norm
+
+            # compute SVD of normalized correlation matrix
+            us,ss,vs = sp.svd(Cnorm)
+            ss       = np.sqrt(ss)
+
+            svec[f,:,:] = vs
+            sval[f,:]   = ss
+
+        savemat(outdir + '/spectralValues.mat',    {'Ss':sval})
+        savemat(outdir + '/spectralVectors.mat',   {'Vs':svec})
         
         # Wrapping up everything and writing output files
         end_time = time.time()
